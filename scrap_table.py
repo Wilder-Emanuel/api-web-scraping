@@ -11,7 +11,7 @@ table = dynamodb.Table(table_name)
 
 def lambda_handler(event, context):
     url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
-
+    
     response = requests.get(url)
     if response.status_code != 200:
         return {
@@ -19,9 +19,10 @@ def lambda_handler(event, context):
             'body': 'Error al acceder a la página web'
         }
 
-    soup = BeautifulSoup(response.content, 'html.parser')
+    # Imprimir el HTML recibido para depurar
+    print(response.text)  # Esto aparecerá en los logs de CloudWatch
 
-    # Buscar la tabla específica de sismos
+    soup = BeautifulSoup(response.content, 'html.parser')
     table = soup.find('table', {'class': 'table table-hover table-bordered table-light border-white w-100'})
     if not table:
         return {
