@@ -5,7 +5,7 @@ import uuid
 
 def lambda_handler(event, context):
     # URL de la página web que contiene la tabla
-    url = " https://ultimosismo.igp.gob.pe/ultimosismo/sismos-reportados"
+    url = "https://ultimosismo.igp.gob.pe/ultimosismo/sismos-reportados"
 
     # Realizar la solicitud HTTP a la página web
     response = requests.get(url)
