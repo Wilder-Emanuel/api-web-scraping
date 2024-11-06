@@ -5,7 +5,7 @@ import uuid
 
 def lambda_handler(event, context):
     # URL de la página web que contiene la tabla
-    url = "https://sgonorte.bomberosperu.gob.pe/24horas/?criterio=/"
+    url = " https://ultimosismo.igp.gob.pe/ultimosismo/sismos-reportados"
 
     # Realizar la solicitud HTTP a la página web
     response = requests.get(url)
@@ -37,7 +37,7 @@ def lambda_handler(event, context):
 
     # Guardar los datos en DynamoDB
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('TablaWebScrapping')
+    table = dynamodb.Table('TablaWebScrapping2')
 
     # Eliminar todos los elementos de la tabla antes de agregar los nuevos
     scan = table.scan()
