@@ -19,7 +19,7 @@ def lambda_handler(event, context):
     soup = BeautifulSoup(response.content, 'html.parser')
 
     # Encontrar la tabla en el HTML
-    table = soup.find('table')
+    table = soup.find('tbody')
     if not table:
         return {
             'statusCode': 404,
