@@ -1,7 +1,8 @@
 import boto3
+import requests
+from bs4 import BeautifulSoup
 import os
 import uuid
-from bs4 import BeautifulSoup
 
 # Configuración de DynamoDB
 dynamodb = boto3.resource('dynamodb')
@@ -9,32 +10,39 @@ table_name = os.environ.get('DYNAMODB_TABLE', 'TablaWebScrapping')
 table = dynamodb.Table(table_name)
 
 def lambda_handler(event, context):
-    # Leer el contenido del archivo HTML
-    with open("htmlSismos.txt", "r", encoding="utf-8") as file:
-        html_content = file.read()
+    # URL de la página web que contiene la tabla de sismos
+    url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
 
-    # Parsear el contenido HTML del archivo
-    soup = BeautifulSoup(html_content, 'html.parser')
+    # Realizar la solicitud HTTP a la página web
+    response = requests.get(url)
+    if response.status_code != 200:
+        return {
+            'statusCode': response.status_code,
+            'body': 'Error al acceder a la página web'
+        }
+
+    # Parsear el contenido HTML de la página web
+    soup = BeautifulSoup(response.content, 'html.parser')
 
     # Buscar la tabla específica en el HTML utilizando sus clases
     table = soup.find('table', {'class': 'table-bordered table-light'})
     if not table:
         return {
             'statusCode': 404,
-            'body': 'No se encontró la tabla en el HTML proporcionado'
+            'body': 'No se encontró la tabla en la página web'
         }
 
     # Extraer los datos de las filas de la tabla
     rows = []
     for row in table.find('tbody').find_all('tr'):
         cells = row.find_all('td')
-        if len(cells) >= 4:
+        if len(cells) >= 4:  # Asegurarse de que hay suficientes columnas
             data = {
                 'ReporteSismico': cells[0].text.strip(),
                 'Referencia': cells[1].text.strip(),
                 'FechaHora': cells[2].text.strip(),
                 'Magnitud': cells[3].text.strip(),
-                'id': str(uuid.uuid4())
+                'id': str(uuid.uuid4())  # Generar un ID único para cada entrada
             }
             rows.append(data)
 
