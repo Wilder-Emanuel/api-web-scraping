@@ -21,6 +21,9 @@ def lambda_handler(event, context):
             'body': 'Error al acceder a la página web'
         }
 
+    # Imprimir el contenido HTML para verificar si la tabla está presente
+    print(response.text)  # Esto se verá en los logs de CloudWatch
+
     # Parsear el contenido HTML de la página web
     soup = BeautifulSoup(response.content, 'html.parser')
 
