@@ -1,8 +1,9 @@
 import boto3
-import requests
-from bs4 import BeautifulSoup
 import os
 import uuid
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
 
 # Configuración de DynamoDB
 dynamodb = boto3.resource('dynamodb')
@@ -10,19 +11,28 @@ table_name = os.environ.get('DYNAMODB_TABLE', 'TablaWebScrappingSismos')
 table = dynamodb.Table(table_name)
 
 def lambda_handler(event, context):
-    url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
-    
-    response = requests.get(url)
-    if response.status_code != 200:
-        return {
-            'statusCode': response.status_code,
-            'body': 'Error al acceder a la página web'
-        }
+    # Configuración de Selenium
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
-    # Imprimir el HTML recibido para depurar
-    print(response.text)  # Esto aparecerá en los logs de CloudWatch
+    # Ruta al driver de Chrome
+    driver_path = '/path/to/chromedriver'  # Reemplaza con la ruta a tu ChromeDriver
 
-    soup = BeautifulSoup(response.content, 'html.parser')
+    # Inicializar el navegador con Selenium
+    driver = webdriver.Chrome(executable_path=driver_path, options=chrome_options)
+    driver.get("https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados")
+
+    # Esperar a que la página cargue completamente
+    driver.implicitly_wait(10)
+
+    # Obtener el HTML de la página cargada con JavaScript
+    html = driver.page_source
+    soup = BeautifulSoup(html, 'html.parser')
+    driver.quit()
+
+    # Buscar la tabla específica de sismos
     table = soup.find('table', {'class': 'table table-hover table-bordered table-light border-white w-100'})
     if not table:
         return {
