@@ -1,31 +1,39 @@
+import requests
 from bs4 import BeautifulSoup
 import boto3
 import uuid
 
 def lambda_handler(event, context):
-    # Cargar el contenido del archivo HTML
-    with open('/mnt/data/htmlSismos.txt', 'r', encoding='utf-8') as file:
-        html_content = file.read()
+    # URL de la página web que contiene la tabla
+    url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
 
-    # Parsear el contenido HTML
-    soup = BeautifulSoup(html_content, 'html.parser')
+    # Realizar la solicitud HTTP a la página web
+    response = requests.get(url)
+    if response.status_code != 200:
+        return {
+            'statusCode': response.status_code,
+            'body': 'Error al acceder a la página web'
+        }
 
-    # Encontrar la tabla en el HTML
-    table = soup.find('table')
+    # Parsear el contenido HTML de la respuesta
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Encontrar la tabla en el HTML (ajusta los parámetros de búsqueda según la estructura del HTML)
+    table = soup.find('table', {'class': 'table table-hover table-bordered table-light border-white w-100'})
     if not table:
         return {
             'statusCode': 404,
-            'body': 'No se encontró la tabla en el archivo HTML'
+            'body': 'No se encontró la tabla en la página web'
         }
 
     # Extraer los encabezados de la tabla
-    headers = [header.text.strip() for header in table.find_all('th')]
+    headers = [header.text.strip() for header in table.find('thead').find_all('th')]
 
     # Extraer las filas de la tabla
     rows = []
-    for row in table.find_all('tr')[1:]:  # Omitir el encabezado
+    for row in table.find('tbody').find_all('tr'):
         cells = row.find_all('td')
-        row_data = {headers[i]: cell.text.strip() for i, cell in enumerate(cells)}
+        row_data = {headers[i]: cells[i].text.strip() for i in range(len(cells))}
         rows.append(row_data)
 
     # Guardar los datos en DynamoDB
