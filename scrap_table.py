@@ -5,7 +5,7 @@ import uuid
 
 def lambda_handler(event, context):
     # URL de la página web que contiene la tabla
-    url = " https://ultimosismo.igp.gob.pe/ultimosismo/sismos-reportados"
+    url = "https://ultimosismo.igp.gob.pe/ultimosismo/sismos-reportados"
 
     # Realizar la solicitud HTTP a la página web
     response = requests.get(url)
@@ -37,7 +37,7 @@ def lambda_handler(event, context):
 
     # Guardar los datos en DynamoDB
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('TablaWebScrapping')
+    table = dynamodb.Table('TablaWebScrappingSismos')
 
     # Eliminar todos los elementos de la tabla antes de agregar los nuevos
     scan = table.scan()
@@ -55,7 +55,7 @@ def lambda_handler(event, context):
         row['#'] = i
         row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
         table.put_item(Item=row)
-        i = i + 1
+        i += 1
 
     # Retornar el resultado como JSON
     return {
