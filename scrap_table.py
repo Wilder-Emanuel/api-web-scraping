@@ -19,7 +19,7 @@ def lambda_handler(event, context):
     soup = BeautifulSoup(response.content, 'html.parser')
 
     # Encontrar la tabla en el HTML
-    table = soup.find('tbody')
+    table = soup.find('ngcontent-ng-c466620633')
     if not table:
         return {
             'statusCode': 404,
