@@ -1,6 +1,7 @@
+import boto3
 import requests
 from bs4 import BeautifulSoup
-import boto3
+import os
 import uuid
 
 def lambda_handler(event, context):
@@ -18,22 +19,19 @@ def lambda_handler(event, context):
     # Parsear el contenido HTML de la página web
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Encontrar la tabla en el HTML
-    table = soup.find('table')
+    # Buscar la tabla específica en el HTML utilizando sus clases
+    table = soup.find('table', {'class': 'table-bordered table-light'})
     if not table:
         return {
             'statusCode': 404,
             'body': 'No se encontró la tabla en la página web'
         }
 
-    # Definir los encabezados de la tabla para los datos relevantes
-    headers = ['Reporte Sísmico', 'Referencia', 'Fecha y Hora', 'Magnitud']
-
-    # Extraer las filas de la tabla
+    # Extraer los datos de las filas de la tabla
     rows = []
-    for row in table.find_all('tr')[1:]:  # Omitir el encabezado
+    for row in table.find('tbody').find_all('tr'):  # Buscar en el <tbody>
         cells = row.find_all('td')
-        if len(cells) >= 4:  # Asegurar que hay suficientes columnas
+        if len(cells) >= 4:  # Asegurarse de que hay suficientes columnas
             data = {
                 'ReporteSismico': cells[0].text.strip(),
                 'Referencia': cells[1].text.strip(),
@@ -45,20 +43,18 @@ def lambda_handler(event, context):
 
     # Guardar los datos en DynamoDB
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('TablaWebScrapping')
-
-    # Eliminar todos los elementos de la tabla antes de agregar los nuevos
-    scan = table.scan()
-    with table.batch_writer() as batch:
-        for each in scan['Items']:
-            batch.delete_item(Key={'id': each['id']})
+    table = dynamodb.Table(os.environ.get('DYNAMODB_TABLE', 'TablaWebScrappingSismosDev'))
 
     # Insertar los nuevos datos
-    for row in rows:
-        table.put_item(Item=row)
+    with table.batch_writer() as batch:
+        for row in rows:
+            batch.put_item(Item=row)
 
-    # Retornar el resultado como JSON
     return {
         'statusCode': 200,
-        'body': rows
+        'body': 'Datos de sismos guardados correctamente en DynamoDB'
     }
+
+# Llamar a la función principal si es necesario
+if __name__ == "__main__":
+    lambda_handler(None, None)
