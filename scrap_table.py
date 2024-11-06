@@ -1,8 +1,6 @@
 import boto3
 import os
 import uuid
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 
 # Configuración de DynamoDB
@@ -10,46 +8,33 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('DYNAMODB_TABLE', 'TablaWebScrappingSismosDev')
 table = dynamodb.Table(table_name)
 
-# Configuración de Selenium
-options = Options()
-options.add_argument("--headless")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
-
-# Ruta al driver de Chrome (asegúrate de actualizarla con la ruta correcta en tu sistema)
-chrome_driver_path = '/path/to/chromedriver'
-
 def scrape_and_store():
-    # Inicializar Selenium WebDriver
-    driver = webdriver.Chrome(chrome_driver_path, options=options)
-    driver.get("https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados")
+    # Leer el contenido del archivo HTML
+    with open("htmlSismos.txt", "r", encoding="utf-8") as file:
+        html_content = file.read()
 
-    # Esperar a que la página cargue completamente
-    driver.implicitly_wait(10)  # espera de 10 segundos
+    # Parsear el contenido HTML del archivo
+    soup = BeautifulSoup(html_content, 'html.parser')
 
-    # Obtener el HTML de la página después de que se haya cargado el JavaScript
-    html = driver.page_source
-    soup = BeautifulSoup(html, 'html.parser')
-
-    # Encontrar la tabla dentro del HTML generado dinámicamente
+    # Buscar la tabla específica en el HTML utilizando sus clases
     table = soup.find('table', {'class': 'table-bordered table-light'})
     if not table:
-        driver.quit()
         return {
             'statusCode': 404,
-            'body': 'No se encontró la tabla en la página web'
+            'body': 'No se encontró la tabla en el HTML proporcionado'
         }
 
+    # Extraer los datos de las filas de la tabla
     rows = []
     for row in table.find('tbody').find_all('tr'):
         cells = row.find_all('td')
-        if len(cells) >= 4:
+        if len(cells) >= 4:  # Asegurarse de que hay suficientes columnas
             data = {
                 'ReporteSismico': cells[0].text.strip(),
                 'Referencia': cells[1].text.strip(),
                 'FechaHora': cells[2].text.strip(),
                 'Magnitud': cells[3].text.strip(),
-                'id': str(uuid.uuid4())
+                'id': str(uuid.uuid4())  # Generar un ID único para cada entrada
             }
             rows.append(data)
 
@@ -57,8 +42,6 @@ def scrape_and_store():
     with table.batch_writer() as batch:
         for item in rows:
             batch.put_item(Item=item)
-
-    driver.quit()
 
     return {
         'statusCode': 200,
