@@ -1,65 +1,64 @@
-import boto3
-import os
-import uuid
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import requests
 from bs4 import BeautifulSoup
-
-# Configuración de DynamoDB
-dynamodb = boto3.resource('dynamodb')
-table_name = os.environ.get('DYNAMODB_TABLE', 'TablaWebScrappingSismos')
-table = dynamodb.Table(table_name)
+import boto3
+import uuid
 
 def lambda_handler(event, context):
-    # Configuración de Selenium
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    # URL de la página web que contiene la tabla
+    url = "https://sgonorte.bomberosperu.gob.pe/24horas/?criterio=/"
 
-    # Ruta al driver de Chrome
-    driver_path = '/path/to/chromedriver'  # Reemplaza con la ruta a tu ChromeDriver
+    # Realizar la solicitud HTTP a la página web
+    response = requests.get(url)
+    if response.status_code != 200:
+        return {
+            'statusCode': response.status_code,
+            'body': 'Error al acceder a la página web'
+        }
 
-    # Inicializar el navegador con Selenium
-    driver = webdriver.Chrome(executable_path=driver_path, options=chrome_options)
-    driver.get("https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados")
+    # Parsear el contenido HTML de la página web
+    soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Esperar a que la página cargue completamente
-    driver.implicitly_wait(10)
-
-    # Obtener el HTML de la página cargada con JavaScript
-    html = driver.page_source
-    soup = BeautifulSoup(html, 'html.parser')
-    driver.quit()
-
-    # Buscar la tabla específica de sismos
-    table = soup.find('table', {'class': 'table table-hover table-bordered table-light border-white w-100'})
+    # Encontrar la tabla en el HTML
+    table = soup.find('table')
     if not table:
         return {
             'statusCode': 404,
             'body': 'No se encontró la tabla en la página web'
         }
 
-    # Extraer los datos de las filas de la tabla
+    # Extraer los encabezados de la tabla
+    headers = [header.text for header in table.find_all('th')]
+
+    # Extraer las filas de la tabla
     rows = []
-    for row in table.find('tbody').find_all('tr'):
+    for row in table.find_all('tr')[1:]:  # Omitir el encabezado
         cells = row.find_all('td')
-        if len(cells) >= 4:
-            data = {
-                'ReporteSismico': cells[0].text.strip(),
-                'Referencia': cells[1].text.strip(),
-                'FechaHora': cells[2].text.strip(),
-                'Magnitud': cells[3].text.strip(),
-                'id': str(uuid.uuid4())
-            }
-            rows.append(data)
+        rows.append({headers[i+1]: cell.text for i, cell in enumerate(cells)})
 
     # Guardar los datos en DynamoDB
-    with table.batch_writer() as batch:
-        for item in rows:
-            batch.put_item(Item=item)
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('TablaWebScrapping')
 
+    # Eliminar todos los elementos de la tabla antes de agregar los nuevos
+    scan = table.scan()
+    with table.batch_writer() as batch:
+        for each in scan['Items']:
+            batch.delete_item(
+                Key={
+                    'id': each['id']
+                }
+            )
+
+    # Insertar los nuevos datos
+    i = 1
+    for row in rows:
+        row['#'] = i
+        row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
+        table.put_item(Item=row)
+        i = i + 1
+
+    # Retornar el resultado como JSON
     return {
         'statusCode': 200,
-        'body': 'Datos de sismos guardados correctamente en DynamoDB'
+        'body': rows
     }
