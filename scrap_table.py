@@ -6,26 +6,25 @@ import uuid
 import time
 
 def lambda_handler(event, context):
-    # Agregar el directorio /opt/bin al PATH para encontrar chromedriver
-    os.environ["PATH"] += os.pathsep + "/opt/bin"
+    # Agregar el directorio /opt al PATH para GeckoDriver
+    os.environ["PATH"] += os.pathsep + "/opt"
 
-    # Configuración de opciones de Selenium
-    options = webdriver.ChromeOptions()
-    options.binary_location = "/opt/bin/headless-chromium"
+    # Configuración de opciones de Selenium para Firefox
+    options = webdriver.FirefoxOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # Iniciar el controlador Chrome
-    driver = webdriver.Chrome(
-        executable_path="/opt/bin/chromedriver",
+    # Iniciar el controlador Firefox con la ubicación de GeckoDriver
+    driver = webdriver.Firefox(
+        executable_path="/opt/geckodriver",
         options=options
     )
 
     # URL de la página de sismos
     url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
     driver.get(url)
-    time.sleep(5)  # Espera para permitir la carga de contenido dinámico
+    time.sleep(5)  # Esperar a que se cargue la tabla
 
     # Extraer los datos de la tabla de sismos
     try:
@@ -42,7 +41,7 @@ def lambda_handler(event, context):
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table('SismosReportados')
         for row in rows:
-            row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
+            row['id'] = str(uuid.uuid4())
             table.put_item(Item=row)
 
         response = {
