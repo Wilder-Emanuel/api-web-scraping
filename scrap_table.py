@@ -1,51 +1,53 @@
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 import boto3
 import uuid
+import time
 
 def lambda_handler(event, context):
-    # URL de la página web que contiene la tabla de sismos
+    # Configurar Selenium con el controlador de Chrome
+    options = webdriver.ChromeOptions()
+    options.headless = True  # Ejecuta Chrome en modo sin interfaz gráfica
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+    # URL de la página web de sismos
     url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
+    driver.get(url)
 
-    # Realizar la solicitud HTTP a la página web
-    response = requests.get(url)
-    if response.status_code != 200:
-        return {
-            'statusCode': response.status_code,
-            'body': 'Error al acceder a la página web'
+    # Esperar a que la tabla se cargue
+    time.sleep(5)  # Ajusta el tiempo según sea necesario
+
+    try:
+        # Buscar la tabla en el HTML
+        table = driver.find_element(By.TAG_NAME, 'table')
+        headers = [header.text for header in table.find_elements(By.TAG_NAME, 'th')]
+        
+        # Extraer los datos de las filas de la tabla
+        rows = []
+        for row in table.find_elements(By.TAG_NAME, 'tr')[1:11]:  # Solo las primeras 10 filas
+            cells = row.find_elements(By.TAG_NAME, 'td')
+            rows.append({headers[i]: cells[i].text for i in range(len(cells))})
+
+        # Guardar los datos en DynamoDB
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('SismosReportados')
+        for row in rows:
+            row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
+            table.put_item(Item=row)
+
+        # Retornar el resultado como JSON
+        response = {
+            'statusCode': 200,
+            'body': rows
         }
-
-    # Parsear el contenido HTML de la página web
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Encontrar la tabla en el HTML
-    table = soup.find('table')
-    if not table:
-        return {
-            'statusCode': 404,
-            'body': 'No se encontró la tabla en la página web'
+    except Exception as e:
+        response = {
+            'statusCode': 500,
+            'body': f"Error al procesar la página: {str(e)}"
         }
+    finally:
+        driver.quit()
 
-    # Extraer los encabezados de la tabla
-    headers = [header.text for header in table.find_all('th')]
-
-    # Extraer las 10 primeras filas de la tabla
-    rows = []
-    for row in table.find_all('tr')[1:11]:  # Extraer solo las primeras 10 filas después del encabezado
-        cells = row.find_all('td')
-        rows.append({headers[i]: cell.text for i, cell in enumerate(cells)})
-
-    # Guardar los datos en DynamoDB
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('SismosReportados')
-
-    # Insertar los datos en la tabla DynamoDB
-    for row in rows:
-        row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
-        table.put_item(Item=row)
-
-    # Retornar el resultado como JSON
-    return {
-        'statusCode': 200,
-        'body': rows
-    }
+    return response
