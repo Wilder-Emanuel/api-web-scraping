@@ -12,12 +12,12 @@ provider:
 
 functions:
   scrape_sismos:
-    handler: scrap_table.lambda_handler  # Cambiado a scrap_table para que coincida con el nombre del archivo
+    handler: scrap_table.lambda_handler
     package:
       include:
         - ./**  # Incluye todo el contenido del directorio
     layers:
-      - arn:aws:lambda:us-east-1:764866452798:layer:chrome-aws-lambda:26
+      - arn:aws:lambda:us-east-1:764866452798:layer:chrome-aws-lambda:26  # Capa que contiene Chrome y ChromeDriver
     events:
       - http:
           path: /scrape/sismos
