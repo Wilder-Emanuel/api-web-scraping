@@ -1,5 +1,4 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 import boto3
 import uuid
@@ -8,14 +7,14 @@ import time
 def lambda_handler(event, context):
     # Configuración de opciones de Selenium
     options = webdriver.ChromeOptions()
-    options.binary_location = "/opt/bin/headless-chromium"  # Ruta de Chrome en la capa
+    options.binary_location = "/opt/bin/headless-chromium"  # Ubicación de Chrome en la capa
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # Iniciar el controlador Chrome con la ubicación en la capa
+    # Iniciar el controlador Chrome con la ubicación de ChromeDriver en la capa
     driver = webdriver.Chrome(
-        executable_path="/opt/bin/chromedriver",
+        executable_path="/opt/bin/chromedriver",  # Ubicación de chromedriver en la capa
         options=options
     )
 
