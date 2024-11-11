@@ -12,7 +12,7 @@ provider:
 
 functions:
   scrape_sismos:
-    handler: scrap_sismos.lambda_handler
+    handler: scrap_table.lambda_handler  # Cambiado a scrap_table para que coincida con el nombre del archivo
     package:
       include:
         - ./**  # Incluye todo el contenido del directorio
