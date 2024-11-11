@@ -1,5 +1,4 @@
 beautifulsoup4==4.9.3
 requests==2.25.1
 selenium==4.5.0
-webdriver-manager==3.8.5
 boto3==1.24.28
