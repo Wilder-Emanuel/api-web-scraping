@@ -1,32 +1,37 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
 import boto3
 import uuid
 import time
 
 def lambda_handler(event, context):
-    # Configurar Selenium con el controlador de Chrome
+    # Configuración de opciones de Selenium
     options = webdriver.ChromeOptions()
-    options.headless = True  # Ejecuta Chrome en modo sin interfaz gráfica
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options.binary_location = "/opt/bin/headless-chromium"  # Ruta de Chrome en la capa
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    # URL de la página web de sismos
+    # Iniciar el controlador Chrome con la ubicación en la capa
+    driver = webdriver.Chrome(
+        executable_path="/opt/bin/chromedriver",
+        options=options
+    )
+
+    # URL de la página de sismos
     url = "https://ultimosismo.igp.gob.pe/ultimo-sismo/sismos-reportados"
     driver.get(url)
+    time.sleep(5)  # Esperar a que se cargue la tabla
 
-    # Esperar a que la tabla se cargue
-    time.sleep(5)  # Ajusta el tiempo según sea necesario
-
+    # Extraer los datos de la tabla
     try:
-        # Buscar la tabla en el HTML
         table = driver.find_element(By.TAG_NAME, 'table')
         headers = [header.text for header in table.find_elements(By.TAG_NAME, 'th')]
-        
-        # Extraer los datos de las filas de la tabla
         rows = []
-        for row in table.find_elements(By.TAG_NAME, 'tr')[1:11]:  # Solo las primeras 10 filas
+        
+        # Extraer las primeras 10 filas
+        for row in table.find_elements(By.TAG_NAME, 'tr')[1:11]:
             cells = row.find_elements(By.TAG_NAME, 'td')
             rows.append({headers[i]: cells[i].text for i in range(len(cells))})
 
@@ -34,10 +39,9 @@ def lambda_handler(event, context):
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table('SismosReportados')
         for row in rows:
-            row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
+            row['id'] = str(uuid.uuid4())  # Agregar un ID único
             table.put_item(Item=row)
 
-        # Retornar el resultado como JSON
         response = {
             'statusCode': 200,
             'body': rows
